@@ -12,6 +12,8 @@ Download the zip from the green Code button on [this repository](https://github.
 
 Verifying the game files puts the original ini back.
 
+**A period in a folder name.** A folder such as `GOG.com` makes a conversation crash. The game treats the last period in a path as the file extension, so the voice file is looked up in the wrong place. When the install path has that shape, `Apply.bat` also makes a launch folder with no period, `D:\RtK` on the same drive, and points the ini at it. Start `RtK.exe` from that folder. Steam's Play button still starts the original path.
+
 ## Install
 
 Extract this folder. Copy it into the game folder so `Apply.bat` sits next to `RtK.exe` and `RTKRONDOR.INI`, then double-click `Apply.bat`.

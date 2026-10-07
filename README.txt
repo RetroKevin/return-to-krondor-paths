@@ -29,6 +29,12 @@ Install
 The previous ini is saved as RTKRONDOR.INI.paths-bak.
 If Steam verify restores the ini, run FixRtK.bat in the game folder.
 
+A folder name with a period, such as GOG.com, crashes a conversation.
+The game cuts the path at that period. Apply.bat then makes a launch
+folder with no period, X:\RtK on the same drive, and points the ini at
+it. Start RtK.exe from that folder. Steam's Play button still starts
+the original path.
+
 This patch does not turn on compatibility mode. The picture fix for
 Windows 10 and 11 is the display patch:
 https://github.com/RetroKevin/return-to-krondor-display
