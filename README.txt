@@ -1,18 +1,19 @@
-Return to Krondor folder paths
-==============================
+Return to Krondor ini repair
+============================
 
-Fixes the Steam error "an error occurred while trying to read the game
-file: .trx". This download does not include the game, and it does not
-change RtK.exe.
+Fixes two Steam problems that both live in RTKRONDOR.INI. This download
+does not include the game, and it does not change RtK.exe.
 
-Steam's RTKRONDOR.INI usually says TrackDir=.\Tracks\. The game uses
-that text as the folder for voice files. Steam often starts the game
-from a different working directory, so the .trx file cannot be opened.
-Verifying the game files puts the relative paths back.
+Voice files. Steam's ini usually says TrackDir=.\Tracks\. The game uses
+that text as the folder for .trx files. Steam often starts the game from
+a different working directory, so the file cannot be opened. This writes
+absolute paths for Tracks, GameData, Worlds, Bkgnd, Audio, and Cinemats.
+An absolute path that already points at a folder on disk is left alone.
 
-This writes absolute paths for Tracks, GameData, Worlds, Bkgnd, Audio,
-and Cinemats. An absolute path that already points at a folder on disk
-is left alone.
+Startup crash. The popup "An error has been detected which prevents the
+game from continuing", or a start that never shows a window, happens
+when the ini asks for a hardware 3D driver. This writes the software
+renderer. Engine=1 with no Driver line is left alone.
 
 Download: https://github.com/RetroKevin/return-to-krondor-paths
 Use the Code button and Download ZIP.
@@ -26,8 +27,11 @@ Install
 4. Double-click Apply.bat.
 
 The previous ini is saved as RTKRONDOR.INI.paths-bak.
-If Steam verify restores the ini, run FixDirectories.bat in the game
-folder.
+If Steam verify restores the ini, run FixRtK.bat in the game folder.
 
-To remove the patch, copy RTKRONDOR.INI.paths-bak over RTKRONDOR.INI
-and delete FixDirectories.bat and FixDirectories.ps1.
+This patch does not turn on compatibility mode. The picture fix for
+Windows 10 and 11 is the display patch:
+https://github.com/RetroKevin/return-to-krondor-display
+
+To remove it, copy RTKRONDOR.INI.paths-bak over RTKRONDOR.INI and delete
+FixRtK.bat and FixRtK.ps1.

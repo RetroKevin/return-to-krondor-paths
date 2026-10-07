@@ -1,12 +1,16 @@
-# Return to Krondor folder paths
+# Return to Krondor ini repair
 
-A small patch for the Steam error **an error occurred while trying to read the game file: .trx**. It does not include the game, and it does not change `RtK.exe`.
-
-Steam's `RTKRONDOR.INI` usually says `TrackDir=.\Tracks\`. The game uses that text as the folder for voice files. Steam often starts the game from a different working directory, so the `.trx` file cannot be opened. This happens most often when a conversation starts. Verifying the game files puts the relative paths back.
-
-The patch writes absolute paths for `Tracks`, `GameData`, `Worlds`, `Bkgnd`, `Audio`, and `Cinemats`. An absolute path that already points at a folder on disk is left alone, so a working GOG install is not rewritten.
+A small patch for two Steam problems that both live in `RTKRONDOR.INI`. It does not include the game, and it does not change `RtK.exe`.
 
 Download the zip from the green Code button on [this repository](https://github.com/RetroKevin/return-to-krondor-paths). Bug reports go in [Issues](https://github.com/RetroKevin/return-to-krondor-paths/issues).
+
+## What one run fixes
+
+**Voice files.** Steam's ini usually says `TrackDir=.\Tracks\`. The game uses that text as the folder for `.trx` files. Steam often starts the game from a different working directory, so the file cannot be opened, most often when a conversation starts. The patch writes absolute paths for `Tracks`, `GameData`, `Worlds`, `Bkgnd`, `Audio`, and `Cinemats`. An absolute path that already points at a folder on disk is left alone, so a working GOG install is not rewritten.
+
+**Startup crash.** The popup "An error has been detected which prevents the game from continuing", or a start that sits in Task Manager with no window, happens when the ini asks for a hardware 3D driver. That call crashes inside the graphics driver. The patch writes the software renderer, which is the renderer a GOG install already falls back to when no driver is selected. `Engine=1` with no Driver line is left alone.
+
+Verifying the game files puts the original ini back.
 
 ## Install
 
@@ -24,8 +28,12 @@ The window names the install and says the previous ini is `RTKRONDOR.INI.paths-b
 
 ## After Steam verifies the files
 
-Verify restores `RTKRONDOR.INI` and the error can come back. `FixDirectories.bat` stays in the game folder. Run it again.
+`FixRtK.bat` stays in the game folder. Run it again.
+
+This patch does not turn on compatibility mode. A Windows 98 or XP mode on `RtK.exe` makes Windows load its own DirectDraw. The picture fix for Windows 10 and 11 is the separate display patch: https://github.com/RetroKevin/return-to-krondor-display
+
+If a folder in the install path contains a period, the script says so and does not move the game.
 
 ## Remove
 
-Copy `RTKRONDOR.INI.paths-bak` over `RTKRONDOR.INI`. Delete `FixDirectories.bat` and `FixDirectories.ps1`.
+Copy `RTKRONDOR.INI.paths-bak` over `RTKRONDOR.INI`. Delete `FixRtK.bat` and `FixRtK.ps1`.

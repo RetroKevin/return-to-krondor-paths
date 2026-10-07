@@ -1,14 +1,18 @@
-# Points RTKRONDOR.INI [Directories] at this install.
-# Steam ships relative paths such as TrackDir=.\Tracks\. The game uses
-# that string as written, and Steam often starts RtK.exe from another
-# working directory, so voice files (.trx) fail to open. An absolute
-# path that already exists is left alone.
+# Repairs RTKRONDOR.INI for a current Windows install.
+# Relative TrackDir=.\Tracks\ cannot open voice files when Steam's working
+# directory is not the game folder. Engine=1 with a Driver guid sends
+# startup into the graphics driver's DLL. One run writes absolute folder
+# paths and, when a hardware driver is selected, the software renderer.
+# An absolute path that already exists is left alone. Engine=1 with no
+# Driver line is left alone, because the game already falls back to software.
+# Compatibility mode is not turned on.
 param(
     [string]$GameDir
 )
 
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$display = 'https://github.com/RetroKevin/return-to-krondor-display'
 
 $Folders = [ordered]@{
     GameDataDir = 'GameData'
@@ -18,6 +22,13 @@ $Folders = [ordered]@{
     AudioDir    = 'Audio'
     SFXAudioDir = 'Audio'
     CinematDir  = 'Cinemats'
+}
+
+$Safe = [ordered]@{
+    Cinemat  = @('Playback=1', 'Stretch=0')
+    Console  = @('Console=0')
+    Audio    = @('MasterVolume=1.000000', 'MusicVolume=1.000000', 'MusicEnabled=1')
+    Graphics = @('Gamma=1.000000', 'Engine=0')
 }
 
 function Resolve-GameDir {
@@ -58,33 +69,128 @@ function Test-DirectoryOk([string]$Value) {
 
 function Install-Helper {
     param([string]$Game, [string]$Source)
-    $src = $Source
-    $dest = Join-Path $Game 'FixDirectories.ps1'
-    $same = $false
-    if ($src -and (Test-Path -LiteralPath $src)) {
-        $left = (Resolve-Path -LiteralPath $src).Path
-        if ((Test-Path -LiteralPath $dest) -and ((Resolve-Path -LiteralPath $dest).Path -eq $left)) {
-            $same = $true
-        }
+    $dest = Join-Path $Game 'FixRtK.ps1'
+    if ($Source -and (Test-Path -LiteralPath $Source)) {
+        $left = (Resolve-Path -LiteralPath $Source).Path
+        $same = (Test-Path -LiteralPath $dest) -and ((Resolve-Path -LiteralPath $dest).Path -eq $left)
         if (-not $same) {
-            Copy-Item -LiteralPath $src -Destination $dest -Force
+            Copy-Item -LiteralPath $Source -Destination $dest -Force
         }
+    }
+    foreach ($old in @('FixDirectories.bat', 'FixDirectories.ps1', 'RepairLaunch.bat', 'RepairLaunch.ps1')) {
+        $path = Join-Path $Game $old
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
     }
     $bat = @"
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0FixDirectories.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0FixRtK.ps1"
 if errorlevel 1 (
     echo.
-    echo The folder paths were not updated.
+    echo RTKRONDOR.INI was not updated.
     pause
     exit /b 1
 )
 echo.
 pause
 "@
-    $batPath = Join-Path $Game 'FixDirectories.bat'
-    $batText = $bat.Replace("`n", "`r`n")
-    [System.IO.File]::WriteAllText($batPath, $batText, [System.Text.Encoding]::ASCII)
+    $batPath = Join-Path $Game 'FixRtK.bat'
+    [System.IO.File]::WriteAllText($batPath, $bat.Replace("`n", "`r`n"), [System.Text.Encoding]::ASCII)
+}
+
+function Test-NeedsLaunchRepair {
+    param($Lines)
+    $section = ''
+    $engine = $null
+    $driver = ''
+    foreach ($line in $Lines) {
+        $body = $line.Trim()
+        if ($body.StartsWith('[') -and $body.EndsWith(']')) {
+            $section = $body.Substring(1, $body.Length - 2).Trim()
+            continue
+        }
+        if ($section -ne 'Graphics' -or -not $body.Contains('=')) { continue }
+        $name = $body.Split('=', 2)[0].Trim()
+        $value = $body.Split('=', 2)[1].Trim().Trim('"')
+        if ($name -eq 'Engine') { $engine = $value }
+        if ($name -eq 'Driver') { $driver = $value }
+    }
+    if ($null -eq $engine) { return $false }
+    $number = 0
+    if (-not [int]::TryParse($engine, [ref]$number)) { return $true }
+    if ($number -eq 0) { return $false }
+    if ($number -eq 1 -and -not $driver) { return $false }
+    return $true
+}
+
+function Repair-LaunchSections {
+    param($Lines)
+    $out = New-Object System.Collections.Generic.List[string]
+    $seen = @{}
+    $i = 0
+    while ($i -lt $Lines.Count) {
+        $body = $Lines[$i].Trim()
+        $replaced = $false
+        if ($body.StartsWith('[') -and $body.EndsWith(']')) {
+            $name = $body.Substring(1, $body.Length - 2).Trim()
+            foreach ($key in @($Safe.Keys)) {
+                if ($name.Equals($key, [StringComparison]::OrdinalIgnoreCase)) {
+                    $seen[$key] = $true
+                    $out.Add('[' + $key + ']')
+                    foreach ($row in $Safe[$key]) { $out.Add($row) }
+                    $i++
+                    while ($i -lt $Lines.Count) {
+                        $peek = $Lines[$i].Trim()
+                        if ($peek.StartsWith('[') -and $peek.EndsWith(']')) { break }
+                        $i++
+                    }
+                    $replaced = $true
+                    break
+                }
+            }
+        }
+        if ($replaced) { continue }
+        $out.Add($Lines[$i])
+        $i++
+    }
+    foreach ($key in $Safe.Keys) {
+        if ($seen.ContainsKey($key)) { continue }
+        if ($out.Count -gt 0 -and $out[$out.Count - 1].Trim()) { $out.Add('') }
+        $out.Add('[' + $key + ']')
+        foreach ($row in $Safe[$key]) { $out.Add($row) }
+    }
+    return $out
+}
+
+function Write-Warnings {
+    param([string]$Game)
+    $cursor = $Game
+    while ($cursor) {
+        $leaf = Split-Path -Path $cursor -Leaf
+        if ($leaf -and $leaf.Contains('.')) {
+            Write-Host "The folder '$leaf' in the install path contains a period. That path shape is a separate launch failure."
+            break
+        }
+        $parent = Split-Path -Path $cursor -Parent
+        if (-not $parent -or $parent -eq $cursor) { break }
+        $cursor = $parent
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $Game 'ddraw.dll'))) {
+        Write-Host "This folder has no ddraw.dll. The picture on Windows 10 and 11 uses the display patch:"
+        Write-Host $display
+    }
+    $reg = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey(
+        'Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers')
+    foreach ($name in @('RtK.exe', 'RtKGame.exe')) {
+        $exe = Join-Path $Game $name
+        if (-not (Test-Path -LiteralPath $exe)) { continue }
+        $layers = ''
+        if ($reg) { $layers = [string]$reg.GetValue($exe) }
+        if ($layers -match 'WIN98|WIN95|WINXP|NT4SP5') {
+            Write-Host "$name has a Windows compatibility mode set. Clear that checkbox."
+            Write-Host "The mode makes Windows load its own DirectDraw. The display patch is the picture fix."
+            break
+        }
+    }
 }
 
 $game = Resolve-GameDir $GameDir
@@ -107,7 +213,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     if ($lines[$i].Trim().ToLowerInvariant() -eq '[directories]') { $start = $i; break }
 }
 
-$changed = New-Object System.Collections.Generic.List[string]
+$pathChanged = New-Object System.Collections.Generic.List[string]
 $missing = New-Object System.Collections.Generic.List[string]
 
 if ($start -lt 0) {
@@ -116,7 +222,7 @@ if ($start -lt 0) {
     foreach ($key in $Folders.Keys) {
         $folder = Join-Path $game $Folders[$key]
         $block.Add($key + '=' + $folder + '\')
-        $changed.Add($key)
+        $pathChanged.Add($key)
         if (-not (Test-Path -LiteralPath $folder -PathType Container)) { $missing.Add($Folders[$key]) }
     }
     $block.Add('')
@@ -142,7 +248,7 @@ if ($start -lt 0) {
         if (Test-DirectoryOk $value) { continue }
         $folder = Join-Path $game $Folders[$match]
         $lines[$i] = $match + '=' + $folder + '\'
-        $changed.Add($match)
+        $pathChanged.Add($match)
         if (-not (Test-Path -LiteralPath $folder -PathType Container)) {
             if (-not $missing.Contains($Folders[$match])) { $missing.Add($Folders[$match]) }
         }
@@ -153,14 +259,19 @@ if ($start -lt 0) {
         $folder = Join-Path $game $Folders[$key]
         $lines.Insert($at, $key + '=' + $folder + '\')
         $at++
-        $changed.Add($key)
+        $pathChanged.Add($key)
         if (-not (Test-Path -LiteralPath $folder -PathType Container)) {
             if (-not $missing.Contains($Folders[$key])) { $missing.Add($Folders[$key]) }
         }
     }
 }
 
-if ($changed.Count -gt 0) {
+$launch = Test-NeedsLaunchRepair $lines
+if ($launch) { $lines = Repair-LaunchSections $lines }
+
+Write-Warnings $game
+
+if ($pathChanged.Count -gt 0 -or $launch) {
     $bak = Join-Path $game 'RTKRONDOR.INI.paths-bak'
     if (-not (Test-Path -LiteralPath $bak)) {
         [System.IO.File]::WriteAllBytes($bak, $raw)
@@ -168,12 +279,19 @@ if ($changed.Count -gt 0) {
     $out = ($lines -join $newline) + $newline
     [System.IO.File]::WriteAllText($ini, $out, $enc)
     Install-Helper $game $PSCommandPath
-    Write-Host "Folder paths now point at $game"
-    Write-Host ("Updated " + ($changed -join ', '))
+    if ($pathChanged.Count -gt 0) {
+        Write-Host "Folder paths now point at $game"
+        Write-Host ("Updated " + ($pathChanged -join ', '))
+    } else {
+        Write-Host "Folder paths already point at folders that exist."
+    }
+    if ($launch) {
+        Write-Host "Launch settings now use the software renderer."
+    }
     Write-Host "The previous ini is RTKRONDOR.INI.paths-bak"
-    Write-Host "If Steam verify restores the ini, run FixDirectories.bat in the game folder."
+    Write-Host "If Steam verify restores the ini, run FixRtK.bat in the game folder."
 } else {
-    Write-Host "Folder paths already point at folders that exist. Nothing was changed."
+    Write-Host "Folder paths and launch settings were already set. Nothing was changed."
 }
 
 if ($missing.Count -gt 0) {
